@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17202B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shot Log">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0;font-size:14px}[hidden]{display:none!important}</style>
+<title>Shooting Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+/* Layout: one-column phone app — sticky date/mode bar, FIBA half-court as the input surface, bottom tab bar */
+:root{
+  --bg:#EDF0F3; --surface:#FFFFFF; --ink:#17202B; --muted:#5A6676; --rule:#D3DAE2;
+  --court:#E6CFA5; --court-paint:#DDBF8C; --court-line:#2F3B4A;
+  --accent:#D4521C; --accent-ink:#FFFFFF;
+  --hot:#1D8556; --warm:#B97F0E; --cold:#C03939; --empty:#7C8794;
+  --s-spot:#2563C9; --s-move:#B5367F; --grid:#E3E8EE;
+  --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1319; --surface:#17202A; --ink:#E6EBF0; --muted:#93A0AE; --rule:#2A3542;
+  --court:#2A251E; --court-paint:#332C22; --court-line:#B3A68F;
+  --accent:#F0793C; --accent-ink:#1A0E06;
+  --hot:#4CC48A; --warm:#E2B246; --cold:#F07070; --empty:#7F8B98;
+  --s-spot:#5A8DE3; --s-move:#D0559A; --grid:#222C38; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1319; --surface:#17202A; --ink:#E6EBF0; --muted:#93A0AE; --rule:#2A3542;
+  --court:#2A251E; --court-paint:#332C22; --court-line:#B3A68F;
+  --accent:#F0793C; --accent-ink:#1A0E06;
+  --hot:#4CC48A; --warm:#E2B246; --cold:#F07070; --empty:#7F8B98;
+  --s-spot:#5A8DE3; --s-move:#D0559A; --grid:#222C38; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-display);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--rule)}
+header.top .wrap{display:grid;gap:10px;padding-block:10px 12px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.brand h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:.04em;text-transform:uppercase}
+.brand h1 b{color:var(--accent)}
+.brand .who{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.datebox{display:flex;align-items:center;gap:2px;flex:1 1 200px;min-width:0}
+.datebox input{flex:1;min-width:0;height:38px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);padding:0 8px;font-weight:500}
+.iconbtn{width:34px;height:38px;border:0;background:transparent;border-radius:8px;font-size:18px;color:var(--muted)}
+.iconbtn:hover{background:var(--bg)}
+.seg{display:inline-flex;background:var(--bg);border:1px solid var(--rule);border-radius:9px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;height:30px;padding:0 14px;border-radius:6px;font-family:var(--f-display);font-weight:600;font-size:16px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+main{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+section.view{display:grid;gap:14px;padding-block:14px}
+.tally{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tally div{min-width:0;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:8px 10px;display:grid;gap:0}
+.tally div.on{border-color:var(--ink)}
+.tally .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.tally .v{font-size:clamp(16px,5.2vw,22px);overflow-wrap:anywhere;font-weight:700;line-height:1.15}
+.tally .p{font-size:13px;color:var(--muted)}
+
+.courtcard{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:8px}
+.courtcard svg{display:block;width:100%;height:auto;max-width:100%}
+.hint{font-size:12.5px;color:var(--muted);margin:2px 4px 0}
+.chip{cursor:pointer}
+.chip rect{stroke-width:.7}
+.chip text{font-family:var(--f-display);fill:var(--ink);text-anchor:middle;font-variant-numeric:tabular-nums}
+.chip .l1{font-size:7px;font-weight:700}
+.chip .l1s{font-size:5.7px}
+.chip .l2{font-size:5.2px;font-weight:600}
+.chip.ro{cursor:default}
+.chip:focus{outline:none}
+.chip:focus-visible rect{stroke:var(--accent);stroke-width:1.4}
+.s-hot rect{fill:var(--hot);fill-opacity:.2;stroke:var(--hot)}
+.s-warm rect{fill:var(--warm);fill-opacity:.22;stroke:var(--warm)}
+.s-cold rect{fill:var(--cold);fill-opacity:.18;stroke:var(--cold)}
+.s-none rect{fill:var(--surface);fill-opacity:.82;stroke:var(--empty);stroke-dasharray:1.6 1.2}
+.s-none text{fill:var(--muted)}
+
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:0 4px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.btn{height:48px;border-radius:10px;border:1px solid var(--rule);background:var(--surface);font-weight:700;padding:0 16px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.block{width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.status{font-size:13px;color:var(--muted);text-align:center}
+.status b{color:var(--hot)}
+.status.warn b{color:var(--warm)}
+
+.demo{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--surface);border:1px dashed var(--warm);border-radius:10px;padding:8px 12px;font-size:13px}
+.demo button{border:0;background:transparent;color:var(--accent);font-weight:700;white-space:nowrap}
+
+h2{margin:6px 0 0;font-family:var(--f-display);font-size:18px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select{height:38px;border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:0 8px}
+
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--rule);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal;min-width:6.5em}
+.zone{display:block;width:max-content;margin-bottom:1px}
+thead th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
+td .p{display:block;font-size:12px;color:var(--muted)}
+td .m{font-family:var(--f-display);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
+tr.sub td{background:var(--bg);font-weight:700}
+tr.grand td{background:var(--ink);color:var(--bg);border-bottom:0}
+tr.grand td .p{color:inherit;opacity:.75}
+tbody tr:last-child td{border-bottom:0}
+.zone{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;border:1px solid var(--rule);border-radius:4px;padding:0 4px;color:var(--muted)}
+
+.hist{display:grid;gap:6px}
+.hist button{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;text-align:left;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:9px 12px}
+.pill{font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;border:1px solid currentColor}
+.pill.ok{color:var(--hot)} .pill.no{color:var(--muted)} .pill.chg{color:var(--warm)}
+
+.field{display:grid;gap:4px}
+.field label{font-size:13px;font-weight:700}
+.field small{color:var(--muted);font-size:12px}
+.field input,.field textarea{border:1px solid var(--rule);border-radius:8px;background:var(--surface);padding:9px 10px;width:100%}
+.field textarea{min-height:110px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px;display:grid;gap:12px}
+
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--rule);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabs button{border:0;background:transparent;height:58px;display:grid;place-items:center;gap:0;font-size:12px;font-weight:700;color:var(--muted);padding-top:6px}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-selected="true"]{color:var(--accent)}
+
+.ghero{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:end;background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:12px 14px}
+.ghero .big{font-size:44px;font-weight:700;line-height:1;justify-content:flex-start}
+.ghero .lab{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;grid-column:1/-1}
+.ghero .side{display:grid;gap:2px;font-size:13px;color:var(--muted);justify-self:end;text-align:right}
+.ghero .side b{color:var(--ink);font-family:var(--f-display);font-size:16px;font-variant-numeric:tabular-nums}
+.delta{font-family:var(--f-display);font-weight:600;font-size:15px;font-variant-numeric:tabular-nums}
+.delta.up{color:var(--hot)} .delta.down{color:var(--cold)}
+.ccard{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:12px 12px 10px;display:grid;gap:8px;min-width:0}
+.ccard h3{margin:0;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ccard h3 small{font-weight:500;color:var(--muted);font-size:12px}
+.keys{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.keys span{display:inline-flex;align-items:center;gap:6px}
+.keys i{display:inline-block;width:16px;height:0;border-top:2px solid}
+.keys i.sq{width:10px;height:10px;border:0;border-radius:2px}
+.plot{position:relative;min-width:0}
+.plot svg{display:block;width:100%;overflow:visible}
+.plot text{font-family:var(--f-display);font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.plot .dl{font-size:12px;font-weight:600;fill:var(--ink)}
+.tip{position:absolute;top:0;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.45;white-space:nowrap;z-index:2}
+.tip .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.tip b{font-family:var(--f-display);font-variant-numeric:tabular-nums}
+.hb{display:grid;gap:7px}
+.hb .r{display:grid;grid-template-columns:7.5em 1fr 5.6em;gap:8px;align-items:center;font-size:12.5px}
+.hb .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb .tr{position:relative;height:14px;background:var(--grid);border-radius:0 4px 4px 0}
+.hb .tr .f{position:absolute;left:0;top:0;bottom:0;border-radius:0 4px 4px 0}
+.hb .tr .th{position:absolute;top:-3px;bottom:-3px;width:0;border-left:1.5px solid var(--muted)}
+.hb .v{text-align:right;font-family:var(--f-display);font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+.hb .v small{display:block;font-weight:500;font-size:11px;color:var(--muted);margin-top:-3px}
+.hb .zh{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);margin-top:4px}
+details.raw summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:4px 0}
+.empty{font-size:13px;color:var(--muted);padding:24px 0;text-align:center}
+.scrim{position:fixed;inset:0;background:rgba(10,14,20,.5);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px));display:grid;gap:14px;max-height:92vh;overflow:auto}
+.sheet h3{margin:0;font-size:17px}
+.sheet .sub{font-size:13px;color:var(--muted)}
+.counter{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.counter .box{border:1px solid var(--rule);border-radius:12px;padding:10px;display:grid;gap:6px;justify-items:center}
+.counter .box span{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.06em}
+.stepper{display:flex;align-items:center;gap:6px;width:100%}
+.stepper button{width:40px;height:44px;border-radius:8px;border:1px solid var(--rule);background:var(--bg);font-size:20px;font-weight:700;flex:none}
+.stepper input{flex:1;min-width:0;height:48px;text-align:center;border:1px solid var(--rule);border-radius:8px;background:var(--surface);font-family:var(--f-display);font-size:28px;font-weight:700}
+.big{display:flex;justify-content:center;align-items:baseline;gap:10px}
+.big .frac{font-size:40px;font-weight:700;line-height:1}
+.big .pct{font-size:20px;color:var(--muted)}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.quick button{height:52px;border-radius:10px;font-weight:700;border:1px solid var(--rule);background:var(--bg)}
+.quick .make{border-color:var(--hot);color:var(--hot)}
+.quick .miss{border-color:var(--cold);color:var(--cold)}
+.presets{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted)}
+.presets button{height:30px;border-radius:999px;border:1px solid var(--rule);background:var(--surface);padding:0 12px;font-size:13px}
+.err{color:var(--cold);font-size:13px;min-height:1.2em;margin:0}
+.actions{display:grid;grid-template-columns:auto 1fr;gap:8px}
+pre.report{white-space:pre-wrap;background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:10px 12px;font-size:12.5px;margin:0;max-height:38vh;overflow:auto}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13.5px;z-index:30;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Shooting <b>Log</b></h1>
+      <span class="who" id="who"></span>
+    </div>
+    <div class="controls">
+      <div class="datebox">
+        <button class="iconbtn" id="prevDay" aria-label="前の日">‹</button>
+        <input type="date" id="date" aria-label="日付">
+        <button class="iconbtn" id="nextDay" aria-label="次の日">›</button>
+      </div>
+      <div class="seg" role="group" aria-label="種類" id="modeSeg">
+        <button data-mode="Spot" aria-pressed="true">Spot</button>
+        <button data-mode="Moving" aria-pressed="false">Moving</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 記録 -->
+  <section class="view wrap" id="v-record">
+    <div class="demo" id="demoBar" hidden>
+      <span>サンプルデータを表示中です</span>
+      <button id="clearDemo">消去して始める</button>
+    </div>
+    <div class="tally" id="dayTally"></div>
+    <div class="courtcard">
+      <svg id="court" viewBox="-13 -6 176 118" role="group" aria-label="コート図"></svg>
+      <p class="hint">スポットをタップして「成功 / 本数」を入力</p>
+    </div>
+    <div class="legend" id="legend"></div>
+    <button class="btn primary block" id="reportBtn">管理者に報告</button>
+    <p class="status" id="reportStatus"></p>
+  </section>
+
+  <!-- 集計 -->
+  <section class="view wrap" id="v-stats" hidden>
+    <div class="row">
+      <select id="period" aria-label="期間">
+        <option value="day">選択日のみ</option>
+        <option value="7">選択日まで7日間</option>
+        <option value="30">選択日まで30日間</option>
+        <option value="all" selected>全期間</option>
+      </select>
+      <div class="seg" role="group" aria-label="集計対象" id="statSeg">
+        <button data-m="Spot" aria-pressed="false">Spot</button>
+        <button data-m="Moving" aria-pressed="false">Moving</button>
+        <button data-m="Total" aria-pressed="true">Total</button>
+      </div>
+    </div>
+    <div class="tally" id="statTally"></div>
+    <div class="courtcard">
+      <svg id="statCourt" viewBox="-13 -6 176 118" role="img" aria-label="集計コート図"></svg>
+    </div>
+    <div class="tablewrap"><table id="statTable"></table></div>
+    <h2>履歴</h2>
+    <div class="hist" id="hist"></div>
+  </section>
+
+  <!-- グラフ -->
+  <section class="view wrap" id="v-graph" hidden>
+    <div class="row">
+      <select id="gPeriod" aria-label="期間">
+        <option value="7">選択日まで7日間</option>
+        <option value="30" selected>選択日まで30日間</option>
+        <option value="90">選択日まで90日間</option>
+        <option value="all">全期間</option>
+      </select>
+      <select id="gZone" aria-label="ゾーン">
+        <option value="ALL">全ゾーン</option>
+        <option value="3P">3Pのみ</option>
+        <option value="MID">ミドルのみ</option>
+        <option value="FT">フリースローのみ</option>
+      </select>
+    </div>
+    <div class="ghero" id="gHero"></div>
+    <div class="ccard">
+      <h3>成功率の推移 <small>点をタップで詳細</small></h3>
+      <div class="keys"><span><i style="border-color:var(--s-spot)"></i>Spot</span><span><i style="border-color:var(--s-move)"></i>Moving</span><span><i style="border-color:var(--muted);border-top-style:dashed"></i>Total</span></div>
+      <div class="plot" id="gTrend"></div>
+    </div>
+    <div class="ccard">
+      <h3>スポット別成功率
+        <span class="seg" role="group" aria-label="対象" id="gSpotSeg"><button data-m="Spot" aria-pressed="false">Spot</button><button data-m="Moving" aria-pressed="false">Moving</button><button data-m="Total" aria-pressed="true">Total</button></span>
+      </h3>
+      <div class="keys"><span><i style="height:12px;width:0;border-top:0;border-left:1.5px solid var(--muted)"></i>好調ライン(3P 60% ・ MID 70% ・ FT 80%)</span></div>
+      <div class="hb" id="gSpots"></div>
+    </div>
+    <div class="ccard">
+      <h3>練習本数</h3>
+      <div class="keys"><span><i class="sq" style="background:var(--s-spot)"></i>Spot</span><span><i class="sq" style="background:var(--s-move)"></i>Moving</span></div>
+      <div class="plot" id="gVol"></div>
+    </div>
+    <details class="raw"><summary>数値を表で見る</summary><div class="tablewrap"><table id="gTable"></table></div></details>
+  </section>
+
+  <!-- 設定 -->
+  <section class="view wrap" id="v-settings" hidden>
+    <div class="card">
+      <div class="field">
+        <label for="player">選手名</label>
+        <input id="player" placeholder="例:福岡 太郎" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="endpoint">報告先URL(管理者が配布)</label>
+        <input id="endpoint" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url">
+        <small>未設定のときは、報告ボタンでテキストをコピーしてLINE等で送れます。</small>
+      </div>
+      <button class="btn primary" id="saveSettings">保存</button>
+    </div>
+    <div class="card">
+      <div class="field">
+        <label for="backup">バックアップ</label>
+        <small>機種変更時は「書き出し」をコピーし、新しい端末で貼り付けて「読み込み」。</small>
+        <textarea id="backup" spellcheck="false"></textarea>
+      </div>
+      <div class="row">
+        <button class="btn" id="exportBtn">書き出し</button>
+        <button class="btn" id="importBtn">読み込み</button>
+        <button class="btn" id="wipeBtn" style="margin-left:auto;color:var(--cold)">全データ削除</button>
+      </div>
+      <p class="err" id="backupMsg"></p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" role="tablist">
+  <div class="in">
+    <button role="tab" data-tab="record" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h18v16H3z"/><path d="M8 4v5a4 4 0 0 0 8 0V4"/><circle cx="12" cy="7" r="1.2" fill="currentColor"/></svg>記録</button>
+    <button role="tab" data-tab="stats" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>集計</button>
+    <button role="tab" data-tab="graph" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/><circle cx="20" cy="5" r="1.3" fill="currentColor"/></svg>グラフ</button>
+    <button role="tab" data-tab="settings" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg>設定</button>
+  </div>
+</nav>
+
+<div id="layer"></div>
+
+<script>
+(() => {
+/* ===== 設定(管理者が配布前に書き換え可) ===== */
+const DEFAULT_ENDPOINT = "https://script.google.com/macros/s/AKfycbwspeT5OAAXVpblQ5DrLkCRDa9WCtDjxjKPQ7ccAyNsx5dS7YQeJmqIQQTsJsLnDSkHmw/exec";          // Apps Script の /exec URL を入れると全員に適用
+const DEMO = false;    // プレビュー用サンプル
+
+/* ===== スポット定義(FIBA寸法 0.1m単位、リング中心 = (75, 15.75)) ===== */
+const SPOTS = [
+  {id:"C3L", name:"左コーナー3",   zone:"3P",  x:3,   y:12},
+  {id:"W3L", name:"左ウイング3",   zone:"3P",  x:20,  y:71},
+  {id:"T3",  name:"トップ3",       zone:"3P",  x:75,  y:96},
+  {id:"W3R", name:"右ウイング3",   zone:"3P",  x:130, y:71},
+  {id:"C3R", name:"右コーナー3",   zone:"3P",  x:147, y:12},
+  {id:"BML", name:"左ベースライン", zone:"MID", x:32,  y:21},
+  {id:"WML", name:"左ウイングミドル",zone:"MID", x:42,  y:52},
+  {id:"TM",  name:"トップミドル",   zone:"MID", x:75,  y:70},
+  {id:"WMR", name:"右ウイングミドル",zone:"MID", x:108, y:52},
+  {id:"BMR", name:"右ベースライン", zone:"MID", x:118, y:21},
+  {id:"FT",  name:"フリースロー",   zone:"FT",  x:75,  y:44, spotOnly:true},
+];
+// hot: この%以上=好調 / cold: この%以下(coldIncl=false なら未満)=要改善 / その間=標準
+const ZONES = {"3P":{label:"3P", hot:60, cold:35, coldIncl:true}, "MID":{label:"MID", hot:70, cold:50, coldIncl:true}, "FT":{label:"FT", hot:80, cold:70, coldIncl:false}};
+const MODES = ["Spot","Moving"];
+const KEY = "shotlog.v1";
+
+/* ===== 状態 ===== */
+let db = load();
+let curDate = todayStr();
+let curMode = "Spot";
+let statMode = "Total";
+
+function blank(){ return {player:"", endpoint:"", demo:false, days:{}}; }
+function load(){
+  try{ const s = localStorage.getItem(KEY); if(s) return Object.assign(blank(), JSON.parse(s)); }catch(e){}
+  const d = blank(); if(DEMO){ seedDemo(d); } return d;
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){} }
+function endpoint(){ return (db.endpoint || DEFAULT_ENDPOINT || "").trim(); }
+
+/* ===== 日付 ===== */
+function pad(n){ return String(n).padStart(2,"0"); }
+function fmt(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function todayStr(){ return fmt(new Date()); }
+function addDays(s,n){ const [y,m,d]=s.split("-").map(Number); const t=new Date(y,m-1,d); t.setDate(t.getDate()+n); return fmt(t); }
+const WD = ["日","月","火","水","木","金","土"];
+function jpDate(s){ const [y,m,d]=s.split("-").map(Number); return `${m}/${d}(${WD[new Date(y,m-1,d).getDay()]})`; }
+
+/* ===== データ操作 ===== */
+function day(s, create){
+  if(!db.days[s] && create) db.days[s] = {Spot:{}, Moving:{}, updatedAt:0, reportedAt:0};
+  return db.days[s];
+}
+function get(s, mode, id){ const d=db.days[s]; return d && d[mode] && d[mode][id] || null; }
+function setVal(s, mode, id, m, a){
+  const d = day(s, true);
+  if(a>0) d[mode][id] = [m,a]; else delete d[mode][id];
+  d.updatedAt = Date.now();
+  if(!Object.keys(d.Spot).length && !Object.keys(d.Moving).length && !d.reportedAt) delete db.days[s];
+  save();
+}
+function spotsFor(mode){ return SPOTS.filter(s => mode !== "Moving" || !s.spotOnly); }
+function sumOver(dates, mode){
+  const per = {}; SPOTS.forEach(s => per[s.id]=[0,0]);
+  const modes = mode==="Total" ? MODES : [mode];
+  dates.forEach(ds => { const d=db.days[ds]; if(!d) return;
+    modes.forEach(md => Object.entries(d[md]||{}).forEach(([id,[m,a]]) => { if(per[id]){ per[id][0]+=m; per[id][1]+=a; } }));
+  });
+  return per;
+}
+function total(per, filter){ let m=0,a=0; SPOTS.forEach(s=>{ if(!filter||filter(s)){ m+=per[s.id][0]; a+=per[s.id][1]; } }); return [m,a]; }
+function pct(m,a){ return a ? (m/a*100) : null; }
+function pctStr(m,a){ const p=pct(m,a); return p==null ? "—" : p.toFixed(1)+"%"; }
+function state(zone, m, a){ if(!a) return "none"; const z=ZONES[zone], p=m*100; if(p>=z.hot*a) return "hot"; if(z.coldIncl ? p<=z.cold*a : p<z.cold*a) return "cold"; return "warm"; }
+
+/* ===== コート描画 ===== */
+function courtLines(){
+  // ベースライン y=0, リング中心 (75,15.75), 3P 6.75m / コーナー 6.60m, 制限区域 4.9m幅×5.8m
+  return `
+  <rect x="0" y="0" width="150" height="112" fill="var(--court)"/>
+  <rect x="50.5" y="0" width="49" height="58" fill="var(--court-paint)"/>
+  <g fill="none" stroke="var(--court-line)" stroke-width=".6">
+    <rect x="0" y="0" width="150" height="112"/>
+    <rect x="50.5" y="0" width="49" height="58"/>
+    <path d="M57 58 A18 18 0 0 0 93 58"/>
+    <path d="M57 58 A18 18 0 0 1 93 58" stroke-dasharray="2 2"/>
+    <path d="M9 0 L9 29.9 A67.5 67.5 0 0 0 141 29.9 L141 0"/>
+    <path d="M62.5 12 L62.5 15.75 A12.5 12.5 0 0 0 87.5 15.75 L87.5 12"/>
+    <line x1="66" y1="12" x2="84" y2="12" stroke-width="1"/>
+    <circle cx="75" cy="15.75" r="2.25" stroke="var(--accent)" stroke-width=".8"/>
+  </g>`;
+}
+function chip(s, v, interactive){
+  const [m,a] = v || [0,0];
+  const st = state(s.zone, m, a);
+  const l1 = a ? `${m}/${a}` : "—";
+  const l2 = a ? pctStr(m,a) : (interactive ? "タップ" : "");
+  const long = l1.length>6, w = long?31:28, h=17;
+  const attrs = interactive ? `tabindex="0" role="button" aria-label="${s.name} ${a?`${m}/${a}`:"未入力"}" data-id="${s.id}"` : "";
+  return `<g class="chip s-${st}${interactive?"":" ro"}" ${attrs} transform="translate(${s.x} ${s.y})">
+    <rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="3"/>
+    <text class="l1${long?" l1s":""}" y="-0.6">${l1}</text>
+    <text class="l2" y="5.6">${l2}</text></g>`;
+}
+function drawCourt(svg, valuesById, mode, interactive){
+  svg.innerHTML = courtLines() + spotsFor(mode).map(s => chip(s, valuesById[s.id], interactive)).join("");
+}
+
+/* ===== 記録ビュー ===== */
+const $ = id => document.getElementById(id);
+function renderRecord(){
+  $("date").value = curDate;
+  document.querySelectorAll("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode===curMode));
+  const d = db.days[curDate];
+  const vals = {}; spotsFor(curMode).forEach(s => { const v=get(curDate,curMode,s.id); if(v) vals[s.id]=v; });
+  drawCourt($("court"), vals, curMode, true);
+  const per = sumOver([curDate], "Spot"), perM = sumOver([curDate], "Moving"), perT = sumOver([curDate], "Total");
+  $("dayTally").innerHTML = [["Spot",per],["Moving",perM],["Total",perT]].map(([k,p]) => {
+    const [m,a] = total(p);
+    return `<div class="${k===curMode?"on":""}"><span class="k">${k}</span><span class="v num">${m}/${a}</span><span class="p num">${pctStr(m,a)}</span></div>`;
+  }).join("");
+  const has = d && (Object.keys(d.Spot).length || Object.keys(d.Moving).length);
+  $("reportBtn").disabled = !has;
+  const st = $("reportStatus"); st.className = "status";
+  if(d && d.reportedAt){
+    const t = new Date(d.reportedAt);
+    if(d.updatedAt > d.reportedAt){ st.className="status warn"; st.innerHTML = `<b>報告後に変更あり</b> ・ もう一度報告してください`; }
+    else st.innerHTML = `<b>報告済み</b> ・ ${t.getMonth()+1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+  } else st.textContent = has ? "未報告" : "この日の記録はまだありません";
+  $("demoBar").hidden = !db.demo;
+  $("who").textContent = db.player ? db.player : "選手名未設定";
+  $("legend").innerHTML = `<span><i style="background:var(--hot)"></i>好調</span><span><i style="background:var(--warm)"></i>標準</span><span><i style="background:var(--cold)"></i>要改善</span><span>好調 3P 60%以上 ・ MID 70%以上 ・ FT 80%以上</span><span>要改善 3P 35%以下 ・ MID 50%以下 ・ FT 70%未満</span>`;
+}
+
+/* ===== 入力シート ===== */
+function openInput(id){
+  const s = SPOTS.find(x=>x.id===id);
+  const v = get(curDate, curMode, id) || [0,0];
+  let m=v[0], a=v[1];
+  const L = $("layer");
+  L.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t">
+    <div><h3 id="sh-t">${s.name}</h3><div class="sub">${jpDate(curDate)} ・ ${curMode} ・ ${ZONES[s.zone].label}</div></div>
+    <div class="big"><span class="frac num" id="bf"></span><span class="pct num" id="bp"></span></div>
+    <div class="quick"><button class="make" id="qMake">成功 +1</button><button class="miss" id="qMiss">失敗 +1</button></div>
+    <div class="counter">
+      <div class="box"><span>成功</span><div class="stepper"><button data-t="m" data-d="-1" aria-label="成功を減らす">−</button><input id="inM" type="number" inputmode="numeric" min="0"><button data-t="m" data-d="1" aria-label="成功を増やす">+</button></div></div>
+      <div class="box"><span>本数</span><div class="stepper"><button data-t="a" data-d="-1" aria-label="本数を減らす">−</button><input id="inA" type="number" inputmode="numeric" min="0"><button data-t="a" data-d="1" aria-label="本数を増やす">+</button></div></div>
+    </div>
+    <div class="presets">本数: ${[10,20,25,50,100].map(n=>`<button data-n="${n}">${n}</button>`).join("")}</div>
+    <p class="err" id="inErr"></p>
+    <div class="actions"><button class="btn" id="inClear">クリア</button><button class="btn primary" id="inSave">保存</button></div>
+  </div></div>`;
+  const inM=$("inM"), inA=$("inA");
+  const sync = (fromInputs) => {
+    if(fromInputs){ m = Math.max(0, parseInt(inM.value)||0); a = Math.max(0, parseInt(inA.value)||0); }
+    else { inM.value = m; inA.value = a; }
+    $("bf").textContent = `${m}/${a}`; $("bp").textContent = pctStr(m,a);
+    $("inErr").textContent = m>a ? "成功数が本数を超えています" : "";
+    $("inSave").disabled = m>a;
+  };
+  sync(false);
+  inM.addEventListener("input",()=>sync(true)); inA.addEventListener("input",()=>sync(true));
+  L.querySelectorAll(".stepper button").forEach(b=>b.onclick=()=>{ const d=+b.dataset.d; if(b.dataset.t==="m") m=Math.max(0,m+d); else a=Math.max(0,a+d); sync(false); });
+  L.querySelectorAll(".presets button").forEach(b=>b.onclick=()=>{ a=+b.dataset.n; sync(false); });
+  $("qMake").onclick=()=>{ m++; a++; sync(false); };
+  $("qMiss").onclick=()=>{ a++; sync(false); };
+  $("inClear").onclick=()=>{ m=0; a=0; sync(false); };
+  $("inSave").onclick=()=>{ if(m>a) return; setVal(curDate,curMode,id,m,a); closeLayer(); renderAll(); toast(a?`${s.name} ${m}/${a} を保存`:`${s.name} を消去`); };
+  $("scrim").onclick=e=>{ if(e.target.id==="scrim") closeLayer(); };
+  setTimeout(()=>inA.focus({preventScroll:true}),50);
+}
+function closeLayer(){ $("layer").innerHTML=""; }
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeLayer(); });
+
+/* ===== 報告 ===== */
+function reportPayload(ds){
+  const d = db.days[ds]; const rows=[];
+  MODES.forEach(md => spotsFor(md).forEach(s => { const v=d[md][s.id]; if(v) rows.push({mode:md, spot:s.id, spotName:s.name, zone:s.zone, made:v[0], att:v[1]}); }));
+  return {player:db.player, date:ds, sentAt:new Date().toISOString(), rows};
+}
+function reportText(ds){
+  const lines = [`【シューティング報告】`, `選手:${db.player||"(未設定)"}`, `日付:${ds} ${jpDate(ds).slice(-3)}`];
+  [...MODES,"Total"].forEach(md => {
+    const per = sumOver([ds], md); const [m,a]=total(per); if(!a) return;
+    lines.push(``, `■${md} ${m}/${a} (${pctStr(m,a)})`);
+    if(md!=="Total") spotsFor(md).forEach(s=>{ const [x,y]=per[s.id]; if(y) lines.push(`  ${s.name} ${x}/${y} (${pctStr(x,y)})`); });
+    else Object.keys(ZONES).forEach(z=>{ const [x,y]=total(per,s=>s.zone===z); if(y) lines.push(`  ${ZONES[z].label} ${x}/${y} (${pctStr(x,y)})`); });
+  });
+  return lines.join("\n");
+}
+function openReport(){
+  const ds = curDate;
+  const L = $("layer");
+  const ep = endpoint();
+  L.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rp-t">
+    <div><h3 id="rp-t">管理者に報告</h3><div class="sub">${jpDate(ds)} の Spot / Moving / Total を送信します</div></div>
+    <div class="field"><label for="rpName">選手名</label><input id="rpName" value="${esc(db.player)}" placeholder="例:福岡 太郎"></div>
+    <pre class="report" id="rpText"></pre>
+    <p class="err" id="rpErr"></p>
+    <div class="actions"><button class="btn" id="rpCopy">コピー</button><button class="btn primary" id="rpSend">${ep?"送信":"送信先が未設定"}</button></div>
+    ${ep?"":`<p class="sub" style="margin:0">送信先URLは「設定」で入力できます。今は「コピー」してLINE等で送ってください。</p>`}
+  </div></div>`;
+  const refresh=()=>{ $("rpText").textContent = reportText(ds); };
+  $("rpName").addEventListener("input",e=>{ db.player=e.target.value.trim(); save(); refresh(); $("who").textContent = db.player || "選手名未設定"; });
+  refresh();
+  $("rpSend").disabled = !ep;
+  $("rpCopy").onclick = async () => {
+    if(!db.player){ $("rpErr").textContent="選手名を入力してください"; return; }
+    const ok = await copy($("rpText").textContent, $("rpText"));
+    toast(ok ? "コピーしました" : "テキストを選択しました。長押しでコピーしてください");
+  };
+  $("rpSend").onclick = async () => {
+    if(!db.player){ $("rpErr").textContent="選手名を入力してください"; return; }
+    $("rpSend").disabled = true; $("rpSend").textContent = "送信中…"; $("rpErr").textContent="";
+    try{
+      await fetch(ep, {method:"POST", mode:"no-cors", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(reportPayload(ds))});
+      db.days[ds].reportedAt = Date.now(); save(); closeLayer(); renderAll(); toast("報告を送信しました");
+    }catch(e){
+      $("rpErr").textContent = "送信できませんでした。通信を確認するか、「コピー」してLINE等で送ってください。";
+      $("rpSend").disabled = false; $("rpSend").textContent = "再送信";
+    }
+  };
+  $("scrim").onclick=e=>{ if(e.target.id==="scrim") closeLayer(); };
+}
+
+/* ===== 集計ビュー ===== */
+function periodDates(){
+  const p = $("period").value; const all = Object.keys(db.days).sort();
+  if(p==="all") return all;
+  if(p==="day") return [curDate];
+  const from = addDays(curDate, -(+p-1));
+  return all.filter(d => d>=from && d<=curDate);
+}
+function cell(m,a){ return a ? `<span class="m">${m}/${a}</span><span class="p">${pctStr(m,a)}</span>` : `<span class="p">—</span>`; }
+function renderStats(){
+  document.querySelectorAll("#statSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===statMode));
+  const dates = periodDates();
+  const P = {Spot:sumOver(dates,"Spot"), Moving:sumOver(dates,"Moving"), Total:sumOver(dates,"Total")};
+  $("statTally").innerHTML = ["Spot","Moving","Total"].map(k=>{ const [m,a]=total(P[k]); return `<div class="${k===statMode?"on":""}"><span class="k">${k}</span><span class="v num">${m}/${a}</span><span class="p num">${pctStr(m,a)}</span></div>`; }).join("");
+  const vals={}; SPOTS.forEach(s=>{ if(P[statMode][s.id][1]) vals[s.id]=P[statMode][s.id]; });
+  drawCourt($("statCourt"), vals, statMode==="Moving"?"Moving":"Spot", false);
+  let h = `<thead><tr><th>スポット</th><th>Spot</th><th>Moving</th><th>Total</th></tr></thead><tbody>`;
+  Object.keys(ZONES).forEach(z=>{
+    SPOTS.filter(s=>s.zone===z).forEach(s=>{
+      h += `<tr><td><span class="zone">${ZONES[z].label}</span>${s.name}</td>` + ["Spot","Moving","Total"].map(k=>`<td>${s.spotOnly&&k==="Moving"?'<span class="p">—</span>':cell(...P[k][s.id])}</td>`).join("") + `</tr>`;
+    });
+    h += `<tr class="sub"><td>${ZONES[z].label} 計</td>` + ["Spot","Moving","Total"].map(k=>`<td>${cell(...total(P[k],s=>s.zone===z))}</td>`).join("") + `</tr>`;
+  });
+  h += `<tr class="grand"><td>合計</td>` + ["Spot","Moving","Total"].map(k=>`<td>${cell(...total(P[k]))}</td>`).join("") + `</tr></tbody>`;
+  $("statTable").innerHTML = h;
+  const days = Object.keys(db.days).sort().reverse();
+  $("hist").innerHTML = days.length ? days.map(ds=>{
+    const d=db.days[ds]; const [m,a]=total(sumOver([ds],"Total"));
+    const pill = d.reportedAt ? (d.updatedAt>d.reportedAt?`<span class="pill chg">要再報告</span>`:`<span class="pill ok">報告済</span>`) : `<span class="pill no">未報告</span>`;
+    return `<button data-d="${ds}"><span>${ds.slice(0,4)}/${jpDate(ds)}</span><span class="num" style="font-weight:700">${m}/${a} <span style="color:var(--muted);font-weight:500">${pctStr(m,a)}</span></span>${pill}</button>`;
+  }).join("") : `<p class="hint">記録はまだありません。「記録」タブのコート図から入力してください。</p>`;
+}
+
+/* ===== 設定 ===== */
+function renderSettings(){ $("player").value = db.player; $("endpoint").value = db.endpoint || DEFAULT_ENDPOINT; }
+
+/* ===== 共通 ===== */
+function esc(s){ return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+async function copy(text, el){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(e){ try{ const r=document.createRange(); r.selectNodeContents(el); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }catch(_){} return false; }
+}
+let tt; function toast(msg){ let t=document.querySelector(".toast"); if(!t){ t=document.createElement("div"); t.className="toast"; t.setAttribute("role","status"); document.body.appendChild(t); } t.textContent=msg; t.hidden=false; clearTimeout(tt); tt=setTimeout(()=>t.hidden=true,2200); }
+let tab="record";
+function showTab(t){
+  tab=t;
+  ["record","stats","graph","settings"].forEach(k=>$("v-"+k).hidden = k!==t);
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
+  renderAll(); window.scrollTo(0,0);
+}
+function renderAll(){ if(tab==="record") renderRecord(); else if(tab==="stats") renderStats(); else if(tab==="graph") renderGraph(); else renderSettings(); $("date").value=curDate; $("who").textContent = db.player || "選手名未設定"; }
+
+/* ===== イベント ===== */
+$("date").addEventListener("change",e=>{ if(e.target.value){ curDate=e.target.value; renderAll(); } });
+$("prevDay").onclick=()=>{ curDate=addDays(curDate,-1); renderAll(); };
+$("nextDay").onclick=()=>{ curDate=addDays(curDate,1); renderAll(); };
+document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{ curMode=b.dataset.mode; if(tab!=="record") showTab("record"); else renderRecord(); });
+document.querySelectorAll("#statSeg button").forEach(b=>b.onclick=()=>{ statMode=b.dataset.m; renderStats(); });
+$("period").onchange=renderStats;
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+$("court").addEventListener("click",e=>{ const g=e.target.closest(".chip[data-id]"); if(g) openInput(g.dataset.id); });
+$("court").addEventListener("keydown",e=>{ const g=e.target.closest(".chip[data-id]"); if(g && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); openInput(g.dataset.id); } });
+$("reportBtn").onclick=openReport;
+$("hist").addEventListener("click",e=>{ const b=e.target.closest("button[data-d]"); if(b){ curDate=b.dataset.d; showTab("record"); } });
+$("saveSettings").onclick=()=>{ db.player=$("player").value.trim(); db.endpoint=$("endpoint").value.trim(); save(); renderAll(); toast("設定を保存しました"); };
+$("exportBtn").onclick=async()=>{ const t=JSON.stringify({player:db.player, days:db.days}); $("backup").value=t; const ok=await copy(t,$("backup")); $("backupMsg").textContent = ok?"コピーしました":"テキスト欄を全選択してコピーしてください"; };
+$("importBtn").onclick=()=>{
+  try{ const o=JSON.parse($("backup").value); if(!o.days) throw 0;
+    Object.entries(o.days).forEach(([k,v])=>{ db.days[k]=v; }); if(o.player && !db.player) db.player=o.player; db.demo=false; save(); renderAll(); $("backupMsg").textContent="読み込みました"; }
+  catch(e){ $("backupMsg").textContent="形式が正しくありません。書き出したテキストをそのまま貼り付けてください。"; }
+};
+let wipeArm=false;
+$("wipeBtn").onclick=()=>{
+  if(!wipeArm){ wipeArm=true; $("wipeBtn").textContent="もう一度押すと削除"; setTimeout(()=>{ wipeArm=false; $("wipeBtn").textContent="全データ削除"; },3000); return; }
+  db.days={}; db.demo=false; save(); wipeArm=false; $("wipeBtn").textContent="全データ削除"; renderAll(); $("backupMsg").textContent="すべての記録を削除しました";
+};
+$("clearDemo").onclick=()=>{ db.days={}; db.demo=false; save(); renderAll(); toast("サンプルを消去しました"); };
+
+/* ===== サンプル ===== */
+function seedDemo(d){
+  d.demo = true; d.player = "サンプル選手";
+  const base = {C3L:.44,W3L:.38,T3:.41,W3R:.35,C3R:.47,BML:.52,WML:.48,TM:.45,WMR:.43,BMR:.55,FT:.82};
+  let seed=7; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
+  for(let i=6;i>=0;i--){
+    const ds = addDays(todayStr(),-i); if(i===3) continue;
+    const rec = {Spot:{}, Moving:{}, updatedAt:Date.now(), reportedAt: i>0 ? Date.now() : 0};
+    SPOTS.forEach(s=>{
+      const n = s.zone==="FT" ? 20 : 25;
+      rec.Spot[s.id] = [Math.round(n*Math.min(.95,base[s.id]+(rnd()-.5)*.16)), n];
+      if(!s.spotOnly){ const nm=20; rec.Moving[s.id] = [Math.round(nm*Math.max(.1,base[s.id]-.07+(rnd()-.5)*.16)), nm]; }
+    });
+    if(i===0){ ["T3","W3R","TM","BMR"].forEach(k=>delete rec.Moving[k]); }
+    d.days[ds] = rec;
+  }
+}
+
+/* ===== グラフ ===== */
+let gSpotMode = "Total";
+const NS = "http://www.w3.org/2000/svg";
+function zoneOk(s){ const z=$("gZone").value; return z==="ALL" || s.zone===z; }
+function rangeDates(period, endDate){
+  const all = Object.keys(db.days).sort().filter(d=>d<=endDate);
+  if(period==="all") return all;
+  const from = addDays(endDate, -(+period-1));
+  return all.filter(d=>d>=from);
+}
+function zoneTotal(dates, mode){ return total(sumOver(dates, mode), zoneOk); }
+function renderGraph(){
+  const period = $("gPeriod").value;
+  const dates = rangeDates(period, curDate).filter(ds => zoneTotal([ds],"Total")[1] > 0);
+  // hero
+  const [tm,ta] = zoneTotal(dates,"Total"), [sm,sa]=zoneTotal(dates,"Spot"), [mm,ma]=zoneTotal(dates,"Moving");
+  let delta = "";
+  if(period!=="all" && ta){
+    const prevEnd = addDays(curDate, -(+period));
+    const [pm,pa] = zoneTotal(rangeDates(period, prevEnd), "Total");
+    if(pa){ const d = (tm/ta - pm/pa)*100; const cls = d>0.05?"up":d<-0.05?"down":""; delta = `<span class="delta ${cls}">${d>0?"▲":d<0?"▼":"±"}${Math.abs(d).toFixed(1)}pt</span> <span style="font-size:12px;color:var(--muted)">前の${period}日間比</span>`; }
+  }
+  const zl = {ALL:"全ゾーン","3P":"3P",MID:"ミドル",FT:"フリースロー"}[$("gZone").value];
+  $("gHero").innerHTML = ta ? `<span class="lab">Total 成功率 ・ ${zl} ・ ${dates.length}日</span>
+    <div><div class="big"><span class="frac num">${pctStr(tm,ta)}</span></div><div>${delta}</div></div>
+    <div class="side"><span>Spot <b>${pctStr(sm,sa)}</b></span><span>Moving <b>${pctStr(mm,ma)}</b></span><span class="num">${tm}/${ta}本</span></div>`
+    : `<span class="lab">Total 成功率</span><div class="empty" style="grid-column:1/-1">この期間の記録はありません</div>`;
+  // series
+  const ser = [
+    {key:"Spot", color:"var(--s-spot)", vals:dates.map(d=>zoneTotal([d],"Spot"))},
+    {key:"Moving", color:"var(--s-move)", vals:dates.map(d=>zoneTotal([d],"Moving"))},
+    {key:"Total", color:"var(--muted)", dash:"4 3", vals:dates.map(d=>zoneTotal([d],"Total"))},
+  ];
+  trendChart($("gTrend"), dates, ser);
+  volChart($("gVol"), dates, ser);
+  spotBars(dates);
+  // table
+  $("gTable").innerHTML = `<thead><tr><th>日付</th><th>Spot</th><th>Moving</th><th>Total</th></tr></thead><tbody>` +
+    (dates.length ? dates.slice().reverse().map((d,ri)=>{ const i=dates.length-1-ri; return `<tr><td>${jpDate(d)}</td>${ser.map(s=>`<td>${cell(...s.vals[i])}</td>`).join("")}</tr>`; }).join("") : `<tr><td colspan="4">記録なし</td></tr>`) + `</tbody>`;
+}
+function svgEl(tag, attrs, parent){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
+function shortDate(d){ const [,m,dd]=d.split("-").map(Number); return `${m}/${dd}`; }
+function xTicks(n, max){ if(n<=max) return [...Array(n).keys()]; const step=Math.ceil((n-1)/(max-1)); const t=[]; for(let i=0;i<n;i+=step) t.push(i); if(t[t.length-1]!==n-1){ if(n-1-t[t.length-1]<step/2) t.pop(); t.push(n-1);} return t; }
+function trendChart(el, dates, ser){
+  el.innerHTML = "";
+  if(!dates.length){ el.innerHTML = `<div class="empty">記録を入力すると推移が表示されます</div>`; return; }
+  const W = Math.max(280, el.clientWidth || 340), H = 210, L=34, R=78, T=12, B=26;
+  const pts = ser.flatMap(s=>s.vals.filter(v=>v[1]).map(v=>v[0]/v[1]*100));
+  let lo = Math.max(0, Math.floor((Math.min(...pts)-4)/10)*10), hi = Math.min(100, Math.ceil((Math.max(...pts)+4)/10)*10);
+  if(hi-lo<20){ hi=Math.min(100,lo+20); lo=Math.max(0,hi-20); }
+  const stepY = hi-lo>60 ? 20 : 10;
+  const n = dates.length, iw = W-L-R, ih = H-T-B;
+  const x = i => L + (n===1 ? iw/2 : i*iw/(n-1));
+  const y = v => T + ih - (v-lo)/(hi-lo)*ih;
+  const svg = svgEl("svg",{viewBox:`0 0 ${W} ${H}`, height:H, role:"img", "aria-label":"成功率の推移"}, el);
+  for(let v=lo; v<=hi; v+=stepY){ svgEl("line",{x1:L,x2:W-R+6,y1:y(v),y2:y(v),stroke:"var(--grid)","stroke-width":1},svg); svgEl("text",{x:L-6,y:y(v)+4,"text-anchor":"end"},svg).textContent=v+"%"; }
+  xTicks(n, Math.max(2, Math.floor(iw/52))).forEach(i=>{ svgEl("text",{x:x(i),y:H-6,"text-anchor":n===1?"middle":i===0?"start":i===n-1?"end":"middle"},svg).textContent=shortDate(dates[i]); });
+  const labels=[];
+  ser.forEach(s=>{
+    let d=""; let pen=false;
+    s.vals.forEach((v,i)=>{ if(!v[1]){ pen=false; return; } d += (pen?"L":"M")+x(i).toFixed(1)+" "+y(v[0]/v[1]*100).toFixed(1)+" "; pen=true; });
+    if(d) svgEl("path",{d, fill:"none", stroke:s.color, "stroke-width":2, "stroke-dasharray":s.dash||"", "stroke-linejoin":"round","stroke-linecap":"round"},svg);
+    if(n<=20 && !s.dash) s.vals.forEach((v,i)=>{ if(v[1]) svgEl("circle",{cx:x(i),cy:y(v[0]/v[1]*100),r:4,fill:s.color,stroke:"var(--surface)","stroke-width":2},svg); });
+    for(let i=n-1;i>=0;i--){ const v=s.vals[i]; if(v[1]){ labels.push({s, i, yy:y(v[0]/v[1]*100), txt:`${s.key} ${(v[0]/v[1]*100).toFixed(1)}%`}); break; } }
+  });
+  labels.sort((a,b)=>a.yy-b.yy); for(let k=1;k<labels.length;k++) if(labels[k].yy-labels[k-1].yy<14) labels[k].yy=labels[k-1].yy+14;
+  labels.forEach(l=>{ svgEl("text",{x:W-R+10,y:l.yy+4,class:"dl"},svg).textContent=l.txt; });
+  // hover
+  const cross = svgEl("line",{y1:T,y2:T+ih,stroke:"var(--muted)","stroke-width":1,visibility:"hidden"},svg);
+  const tip = document.createElement("div"); tip.className="tip"; tip.hidden=true; el.appendChild(tip);
+  const hit = svgEl("rect",{x:L-10,y:0,width:iw+20,height:H,fill:"transparent"},svg);
+  const show = ev => {
+    const r = svg.getBoundingClientRect(); const px = (ev.clientX-r.left)*W/r.width;
+    const i = n===1?0:Math.max(0,Math.min(n-1,Math.round((px-L)/iw*(n-1))));
+    cross.setAttribute("x1",x(i)); cross.setAttribute("x2",x(i)); cross.setAttribute("visibility","visible");
+    tip.innerHTML = `<div>${dates[i].slice(0,4)}/${jpDate(dates[i])}</div>` + ser.map(s=>{ const v=s.vals[i]; return `<div><span class="sw" style="background:${s.color}"></span>${s.key} <b>${v[1]?pctStr(v[0],v[1]):"—"}</b>${v[1]?` <span style="opacity:.7">${v[0]}/${v[1]}</span>`:""}</div>`; }).join("");
+    tip.hidden=false; const px2 = x(i)*r.width/W; const tw = tip.offsetWidth;
+    tip.style.left = Math.max(0, Math.min(r.width-tw, px2 + (px2 > r.width/2 ? -tw-10 : 10))) + "px";
+  };
+  hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show);
+  hit.addEventListener("pointerleave", ()=>{ tip.hidden=true; cross.setAttribute("visibility","hidden"); });
+}
+function volChart(el, dates, ser){
+  el.innerHTML = "";
+  if(!dates.length){ el.innerHTML = `<div class="empty">記録なし</div>`; return; }
+  const W = Math.max(280, el.clientWidth || 340), H = 150, L=34, R=8, T=10, B=24;
+  const n=dates.length, iw=W-L-R, ih=H-T-B;
+  const tot = dates.map((d,i)=>ser[0].vals[i][1]+ser[1].vals[i][1]);
+  const mx = Math.max(...tot); const step = [10,20,25,50,100,200,250,500,1000].find(s=>mx/s<=4) || 1000; const hi = Math.ceil(mx/step)*step || step;
+  const y = v => T+ih - v/hi*ih;
+  const bw = Math.max(3, Math.min(28, iw/n - 4)); const cx = i => L + (i+0.5)*iw/n;
+  const svg = svgEl("svg",{viewBox:`0 0 ${W} ${H}`, height:H, role:"img","aria-label":"練習本数"}, el);
+  for(let v=0; v<=hi; v+=step){ svgEl("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:"var(--grid)"},svg); svgEl("text",{x:L-6,y:y(v)+4,"text-anchor":"end"},svg).textContent=v; }
+  xTicks(n, Math.max(2,Math.floor(iw/52))).forEach(i=>{ svgEl("text",{x:cx(i),y:H-6,"text-anchor":"middle"},svg).textContent=shortDate(dates[i]); });
+  const tip = document.createElement("div"); tip.className="tip"; tip.hidden=true; el.appendChild(tip);
+  dates.forEach((d,i)=>{
+    const a1 = ser[0].vals[i][1], a2 = ser[1].vals[i][1];
+    const g = svgEl("g",{},svg);
+    const r = 4, x0 = cx(i)-bw/2;
+    // bottom segment (Spot) square, top segment (Moving) rounded top; 2px gap between
+    if(a1) svgEl("rect",{x:x0,y:y(a1),width:bw,height:Math.max(0,y(0)-y(a1)),fill:"var(--s-spot)"},g);
+    if(a2){ const top=y(a1+a2), bot=y(a1)-(a1?2:0); const h=Math.max(0,bot-top); const rr=Math.min(r,h,bw/2);
+      svgEl("path",{d:`M${x0} ${bot} V${top+rr} Q${x0} ${top} ${x0+rr} ${top} H${x0+bw-rr} Q${x0+bw} ${top} ${x0+bw} ${top+rr} V${bot} Z`,fill:"var(--s-move)"},g); }
+    const hit = svgEl("rect",{x:cx(i)-iw/n/2,y:T,width:iw/n,height:ih,fill:"transparent"},g);
+    const show = ()=>{ const rc=svg.getBoundingClientRect(); tip.innerHTML=`<div>${jpDate(d)}</div><div><span class="sw" style="background:var(--s-spot)"></span>Spot <b>${a1}</b>本</div><div><span class="sw" style="background:var(--s-move)"></span>Moving <b>${a2}</b>本</div><div>計 <b>${a1+a2}</b>本</div>`; tip.hidden=false; const px=cx(i)*rc.width/W, tw=tip.offsetWidth; tip.style.left=Math.max(0,Math.min(rc.width-tw, px+(px>rc.width/2?-tw-10:10)))+"px"; };
+    hit.addEventListener("pointerenter",show); hit.addEventListener("pointerdown",show); hit.addEventListener("pointerleave",()=>tip.hidden=true);
+  });
+}
+function spotBars(dates){
+  document.querySelectorAll("#gSpotSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===gSpotMode));
+  const per = sumOver(dates, gSpotMode);
+  const color = gSpotMode==="Spot"?"var(--s-spot)":gSpotMode==="Moving"?"var(--s-move)":"var(--muted)";
+  let h="";
+  Object.keys(ZONES).forEach(z=>{
+    const list = SPOTS.filter(s=>s.zone===z && zoneOk(s) && !(gSpotMode==="Moving" && s.spotOnly));
+    if(!list.length) return;
+    h += `<div class="zh">${{"3P":"3P","MID":"ミドル","FT":"フリースロー"}[z]}</div>`;
+    list.forEach(s=>{ const [m,a]=per[s.id]; const p=a?m/a*100:0;
+      h += `<div class="r" title="${s.name} ${a?`${m}/${a} ${pctStr(m,a)}`:"記録なし"}"><span class="nm">${s.name}</span><span class="tr"><span class="f" style="width:${p}%;background:${color}"></span><span class="th" style="left:${ZONES[z].hot}%"></span></span><span class="v">${a?pctStr(m,a):"—"}<small>${a?`${m}/${a}`:""}</small></span></div>`; });
+  });
+  $("gSpots").innerHTML = dates.length ? h : `<div class="empty">記録なし</div>`;
+}
+$("gPeriod").onchange=renderGraph; $("gZone").onchange=renderGraph;
+document.querySelectorAll("#gSpotSeg button").forEach(b=>b.onclick=()=>{ gSpotMode=b.dataset.m; renderGraph(); });
+let rz; window.addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ if(tab==="graph") renderGraph(); },150); });
+
+renderAll();
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+})();
+</script>
+
+</body>
+</html>
