@@ -56,6 +56,9 @@ header.top .wrap{display:grid;gap:10px;padding-block:10px 12px}
 .brand .who{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .datebox{display:flex;align-items:center;gap:2px;flex:1 1 200px;min-width:0}
+#sessSeg button{font-family:var(--f-body);font-size:14px;font-weight:700;letter-spacing:0;padding:0 12px}
+#sessSeg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+@media (max-width:520px){.controls .datebox{flex-basis:100%}.controls .seg{flex:1}.controls .seg button{flex:1}}
 .datebox input{flex:1;min-width:0;height:38px;border:1px solid var(--rule);border-radius:8px;background:var(--bg);padding:0 8px;font-weight:500}
 .iconbtn{width:34px;height:38px;border:0;background:transparent;border-radius:8px;font-size:18px;color:var(--muted)}
 .iconbtn:hover{background:var(--bg)}
@@ -69,7 +72,7 @@ section.view{display:grid;gap:14px;padding-block:14px}
 .tally div{min-width:0;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:8px 10px;display:grid;gap:0}
 .tally div.on{border-color:var(--ink)}
 .tally .k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500}
-.tally .v{font-size:clamp(16px,5.2vw,22px);overflow-wrap:anywhere;font-weight:700;line-height:1.15}
+.tally .v{font-size:clamp(15px,4.6vw,22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;line-height:1.15}
 .tally .p{font-size:13px;color:var(--muted)}
 
 .courtcard{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:8px}
@@ -213,6 +216,10 @@ pre.report{white-space:pre-wrap;background:var(--bg);border:1px solid var(--rule
         <input type="date" id="date" aria-label="日付">
         <button class="iconbtn" id="nextDay" aria-label="次の日">›</button>
       </div>
+      <div class="seg" role="group" aria-label="区分" id="sessSeg">
+        <button data-sess="練習" aria-pressed="true">練習</button>
+        <button data-sess="自主練" aria-pressed="false">自主練</button>
+      </div>
       <div class="seg" role="group" aria-label="種類" id="modeSeg">
         <button data-mode="Spot" aria-pressed="true">Spot</button>
         <button data-mode="Moving" aria-pressed="false">Moving</button>
@@ -247,6 +254,7 @@ pre.report{white-space:pre-wrap;background:var(--bg);border:1px solid var(--rule
         <option value="30">選択日まで30日間</option>
         <option value="all" selected>全期間</option>
       </select>
+      <select id="statSess" aria-label="区分"><option value="all">練習+自主練</option><option value="練習">練習のみ</option><option value="自主練">自主練のみ</option></select>
       <div class="seg" role="group" aria-label="集計対象" id="statSeg">
         <button data-m="Spot" aria-pressed="false">Spot</button>
         <button data-m="Moving" aria-pressed="false">Moving</button>
@@ -271,6 +279,7 @@ pre.report{white-space:pre-wrap;background:var(--bg);border:1px solid var(--rule
         <option value="90">選択日まで90日間</option>
         <option value="all">全期間</option>
       </select>
+      <select id="gSess" aria-label="区分"><option value="all">練習+自主練</option><option value="練習">練習のみ</option><option value="自主練">自主練のみ</option></select>
       <select id="gZone" aria-label="ゾーン">
         <option value="ALL">全ゾーン</option>
         <option value="3P">3Pのみ</option>
@@ -367,18 +376,28 @@ const SPOTS = [
 // hot: この%以上=好調 / cold: この%以下(coldIncl=false なら未満)=要改善 / その間=標準
 const ZONES = {"3P":{label:"3P", hot:60, cold:35, coldIncl:true}, "MID":{label:"MID", hot:70, cold:50, coldIncl:true}, "FT":{label:"FT", hot:80, cold:70, coldIncl:false}};
 const MODES = ["Spot","Moving"];
+const SESS = ["練習","自主練"];
 const KEY = "shotlog.v1";
 
 /* ===== 状態 ===== */
 let db = load();
 let curDate = todayStr();
 let curMode = "Spot";
+let curSess = "練習";
 let statMode = "Total";
 
 function blank(){ return {player:"", endpoint:"", demo:false, days:{}}; }
 function load(){
-  try{ const s = localStorage.getItem(KEY); if(s) return Object.assign(blank(), JSON.parse(s)); }catch(e){}
+  try{ const s = localStorage.getItem(KEY); if(s){ const o = Object.assign(blank(), JSON.parse(s)); migrate(o.days); return o; } }catch(e){}
   const d = blank(); if(DEMO){ seedDemo(d); } return d;
+}
+// 旧形式 {Spot,Moving} → {練習:{Spot,Moving}, 自主練:{…}}
+function migrate(days){
+  Object.values(days||{}).forEach(d => {
+    if(d.Spot || d.Moving){ d["練習"] = {Spot:d.Spot||{}, Moving:d.Moving||{}}; delete d.Spot; delete d.Moving; }
+    SESS.forEach(k => { if(!d[k]) d[k] = {Spot:{}, Moving:{}}; });
+  });
+  return days;
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(db)); }catch(e){} }
 function endpoint(){ return (db.endpoint || DEFAULT_ENDPOINT || "").trim(); }
@@ -393,23 +412,25 @@ function jpDate(s){ const [y,m,d]=s.split("-").map(Number); return `${m}/${d}(${
 
 /* ===== データ操作 ===== */
 function day(s, create){
-  if(!db.days[s] && create) db.days[s] = {Spot:{}, Moving:{}, updatedAt:0, reportedAt:0};
+  if(!db.days[s] && create) db.days[s] = migrate({x:{updatedAt:0, reportedAt:0}}).x;
   return db.days[s];
 }
-function get(s, mode, id){ const d=db.days[s]; return d && d[mode] && d[mode][id] || null; }
-function setVal(s, mode, id, m, a){
+function get(s, sess, mode, id){ const d=db.days[s]; return d && d[sess] && d[sess][mode][id] || null; }
+function hasData(d){ return !!d && SESS.some(k => d[k] && (Object.keys(d[k].Spot).length || Object.keys(d[k].Moving).length)); }
+function setVal(s, sess, mode, id, m, a){
   const d = day(s, true);
-  if(a>0) d[mode][id] = [m,a]; else delete d[mode][id];
+  if(a>0) d[sess][mode][id] = [m,a]; else delete d[sess][mode][id];
   d.updatedAt = Date.now();
-  if(!Object.keys(d.Spot).length && !Object.keys(d.Moving).length && !d.reportedAt) delete db.days[s];
+  if(!hasData(d) && !d.reportedAt) delete db.days[s];
   save();
 }
 function spotsFor(mode){ return SPOTS.filter(s => mode !== "Moving" || !s.spotOnly); }
-function sumOver(dates, mode){
+function sumOver(dates, mode, sess){
   const per = {}; SPOTS.forEach(s => per[s.id]=[0,0]);
   const modes = mode==="Total" ? MODES : [mode];
+  const sessions = !sess || sess==="all" ? SESS : [sess];
   dates.forEach(ds => { const d=db.days[ds]; if(!d) return;
-    modes.forEach(md => Object.entries(d[md]||{}).forEach(([id,[m,a]]) => { if(per[id]){ per[id][0]+=m; per[id][1]+=a; } }));
+    sessions.forEach(k => { if(d[k]) modes.forEach(md => Object.entries(d[k][md]||{}).forEach(([id,[m,a]]) => { if(per[id]){ per[id][0]+=m; per[id][1]+=a; } })); });
   });
   return per;
 }
@@ -457,14 +478,15 @@ function renderRecord(){
   $("date").value = curDate;
   document.querySelectorAll("#modeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode===curMode));
   const d = db.days[curDate];
-  const vals = {}; spotsFor(curMode).forEach(s => { const v=get(curDate,curMode,s.id); if(v) vals[s.id]=v; });
+  document.querySelectorAll("#sessSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.sess===curSess));
+  const vals = {}; spotsFor(curMode).forEach(s => { const v=get(curDate,curSess,curMode,s.id); if(v) vals[s.id]=v; });
   drawCourt($("court"), vals, curMode, true);
-  const per = sumOver([curDate], "Spot"), perM = sumOver([curDate], "Moving"), perT = sumOver([curDate], "Total");
+  const per = sumOver([curDate], "Spot", curSess), perM = sumOver([curDate], "Moving", curSess), perT = sumOver([curDate], "Total", curSess);
   $("dayTally").innerHTML = [["Spot",per],["Moving",perM],["Total",perT]].map(([k,p]) => {
     const [m,a] = total(p);
     return `<div class="${k===curMode?"on":""}"><span class="k">${k}</span><span class="v num">${m}/${a}</span><span class="p num">${pctStr(m,a)}</span></div>`;
   }).join("");
-  const has = d && (Object.keys(d.Spot).length || Object.keys(d.Moving).length);
+  const has = hasData(d);
   $("reportBtn").disabled = !has;
   const st = $("reportStatus"); st.className = "status";
   if(d && d.reportedAt){
@@ -480,11 +502,11 @@ function renderRecord(){
 /* ===== 入力シート ===== */
 function openInput(id){
   const s = SPOTS.find(x=>x.id===id);
-  const v = get(curDate, curMode, id) || [0,0];
+  const v = get(curDate, curSess, curMode, id) || [0,0];
   let m=v[0], a=v[1];
   const L = $("layer");
   L.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t">
-    <div><h3 id="sh-t">${s.name}</h3><div class="sub">${jpDate(curDate)} ・ ${curMode} ・ ${ZONES[s.zone].label}</div></div>
+    <div><h3 id="sh-t">${s.name}</h3><div class="sub">${jpDate(curDate)} ・ ${curSess} ・ ${curMode} ・ ${ZONES[s.zone].label}</div></div>
     <div class="big"><span class="frac num" id="bf"></span><span class="pct num" id="bp"></span></div>
     <div class="quick"><button class="make" id="qMake">成功 +1</button><button class="miss" id="qMiss">失敗 +1</button></div>
     <div class="counter">
@@ -510,7 +532,7 @@ function openInput(id){
   $("qMake").onclick=()=>{ m++; a++; sync(false); };
   $("qMiss").onclick=()=>{ a++; sync(false); };
   $("inClear").onclick=()=>{ m=0; a=0; sync(false); };
-  $("inSave").onclick=()=>{ if(m>a) return; setVal(curDate,curMode,id,m,a); closeLayer(); renderAll(); toast(a?`${s.name} ${m}/${a} を保存`:`${s.name} を消去`); };
+  $("inSave").onclick=()=>{ if(m>a) return; setVal(curDate,curSess,curMode,id,m,a); closeLayer(); renderAll(); toast(a?`${s.name} ${m}/${a} を保存`:`${s.name} を消去`); };
   $("scrim").onclick=e=>{ if(e.target.id==="scrim") closeLayer(); };
   setTimeout(()=>inA.focus({preventScroll:true}),50);
 }
@@ -520,17 +542,22 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeLayer(); });
 /* ===== 報告 ===== */
 function reportPayload(ds){
   const d = db.days[ds]; const rows=[];
-  MODES.forEach(md => spotsFor(md).forEach(s => { const v=d[md][s.id]; if(v) rows.push({mode:md, spot:s.id, spotName:s.name, zone:s.zone, made:v[0], att:v[1]}); }));
+  SESS.forEach(k => MODES.forEach(md => spotsFor(md).forEach(s => { const v=d[k] && d[k][md][s.id]; if(v) rows.push({session:k, mode:md, spot:s.id, spotName:s.name, zone:s.zone, made:v[0], att:v[1]}); })));
   return {player:db.player, date:ds, sentAt:new Date().toISOString(), rows};
 }
 function reportText(ds){
   const lines = [`【シューティング報告】`, `選手:${db.player||"(未設定)"}`, `日付:${ds} ${jpDate(ds).slice(-3)}`];
-  [...MODES,"Total"].forEach(md => {
-    const per = sumOver([ds], md); const [m,a]=total(per); if(!a) return;
-    lines.push(``, `■${md} ${m}/${a} (${pctStr(m,a)})`);
-    if(md!=="Total") spotsFor(md).forEach(s=>{ const [x,y]=per[s.id]; if(y) lines.push(`  ${s.name} ${x}/${y} (${pctStr(x,y)})`); });
-    else Object.keys(ZONES).forEach(z=>{ const [x,y]=total(per,s=>s.zone===z); if(y) lines.push(`  ${ZONES[z].label} ${x}/${y} (${pctStr(x,y)})`); });
+  const used = SESS.filter(k => total(sumOver([ds],"Total",k))[1]);
+  used.forEach(k => {
+    lines.push(``, `【${k}】`);
+    [...MODES,"Total"].forEach(md => {
+      const per = sumOver([ds], md, k); const [m,a]=total(per); if(!a) return;
+      lines.push(`■${md} ${m}/${a} (${pctStr(m,a)})`);
+      if(md!=="Total") spotsFor(md).forEach(s=>{ const [x,y]=per[s.id]; if(y) lines.push(`  ${s.name} ${x}/${y} (${pctStr(x,y)})`); });
+      else Object.keys(ZONES).forEach(z=>{ const [x,y]=total(per,s=>s.zone===z); if(y) lines.push(`  ${ZONES[z].label} ${x}/${y} (${pctStr(x,y)})`); });
+    });
   });
+  if(used.length > 1){ const [m,a]=total(sumOver([ds],"Total","all")); lines.push(``, `【練習+自主練 合計】${m}/${a} (${pctStr(m,a)})`); }
   return lines.join("\n");
 }
 function openReport(){
@@ -538,7 +565,7 @@ function openReport(){
   const L = $("layer");
   const ep = endpoint();
   L.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rp-t">
-    <div><h3 id="rp-t">管理者に報告</h3><div class="sub">${jpDate(ds)} の Spot / Moving / Total を送信します</div></div>
+    <div><h3 id="rp-t">管理者に報告</h3><div class="sub">${jpDate(ds)} の練習・自主練をまとめて送信します</div></div>
     <div class="field"><label for="rpName">選手名</label><input id="rpName" value="${esc(db.player)}" placeholder="例:福岡 太郎"></div>
     <pre class="report" id="rpText"></pre>
     <p class="err" id="rpErr"></p>
@@ -580,7 +607,8 @@ function cell(m,a){ return a ? `<span class="m">${m}/${a}</span><span class="p">
 function renderStats(){
   document.querySelectorAll("#statSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===statMode));
   const dates = periodDates();
-  const P = {Spot:sumOver(dates,"Spot"), Moving:sumOver(dates,"Moving"), Total:sumOver(dates,"Total")};
+  const ss = $("statSess").value;
+  const P = {Spot:sumOver(dates,"Spot",ss), Moving:sumOver(dates,"Moving",ss), Total:sumOver(dates,"Total",ss)};
   $("statTally").innerHTML = ["Spot","Moving","Total"].map(k=>{ const [m,a]=total(P[k]); return `<div class="${k===statMode?"on":""}"><span class="k">${k}</span><span class="v num">${m}/${a}</span><span class="p num">${pctStr(m,a)}</span></div>`; }).join("");
   const vals={}; SPOTS.forEach(s=>{ if(P[statMode][s.id][1]) vals[s.id]=P[statMode][s.id]; });
   drawCourt($("statCourt"), vals, statMode==="Moving"?"Moving":"Spot", false);
@@ -626,7 +654,8 @@ $("prevDay").onclick=()=>{ curDate=addDays(curDate,-1); renderAll(); };
 $("nextDay").onclick=()=>{ curDate=addDays(curDate,1); renderAll(); };
 document.querySelectorAll("#modeSeg button").forEach(b=>b.onclick=()=>{ curMode=b.dataset.mode; if(tab!=="record") showTab("record"); else renderRecord(); });
 document.querySelectorAll("#statSeg button").forEach(b=>b.onclick=()=>{ statMode=b.dataset.m; renderStats(); });
-$("period").onchange=renderStats;
+$("period").onchange=renderStats; $("statSess").onchange=renderStats;
+document.querySelectorAll("#sessSeg button").forEach(b=>b.onclick=()=>{ curSess=b.dataset.sess; if(tab!=="record") showTab("record"); else renderRecord(); });
 document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 $("court").addEventListener("click",e=>{ const g=e.target.closest(".chip[data-id]"); if(g) openInput(g.dataset.id); });
 $("court").addEventListener("keydown",e=>{ const g=e.target.closest(".chip[data-id]"); if(g && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); openInput(g.dataset.id); } });
@@ -636,7 +665,7 @@ $("saveSettings").onclick=()=>{ db.player=$("player").value.trim(); db.endpoint=
 $("exportBtn").onclick=async()=>{ const t=JSON.stringify({player:db.player, days:db.days}); $("backup").value=t; const ok=await copy(t,$("backup")); $("backupMsg").textContent = ok?"コピーしました":"テキスト欄を全選択してコピーしてください"; };
 $("importBtn").onclick=()=>{
   try{ const o=JSON.parse($("backup").value); if(!o.days) throw 0;
-    Object.entries(o.days).forEach(([k,v])=>{ db.days[k]=v; }); if(o.player && !db.player) db.player=o.player; db.demo=false; save(); renderAll(); $("backupMsg").textContent="読み込みました"; }
+    migrate(o.days); Object.entries(o.days).forEach(([k,v])=>{ db.days[k]=v; }); if(o.player && !db.player) db.player=o.player; db.demo=false; save(); renderAll(); $("backupMsg").textContent="読み込みました"; }
   catch(e){ $("backupMsg").textContent="形式が正しくありません。書き出したテキストをそのまま貼り付けてください。"; }
 };
 let wipeArm=false;
@@ -653,13 +682,15 @@ function seedDemo(d){
   let seed=7; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
   for(let i=6;i>=0;i--){
     const ds = addDays(todayStr(),-i); if(i===3) continue;
-    const rec = {Spot:{}, Moving:{}, updatedAt:Date.now(), reportedAt: i>0 ? Date.now() : 0};
+    const rec = migrate({x:{updatedAt:Date.now(), reportedAt: i>0 ? Date.now() : 0}}).x;
+    const P = rec["練習"], S = rec["自主練"];
     SPOTS.forEach(s=>{
       const n = s.zone==="FT" ? 20 : 25;
-      rec.Spot[s.id] = [Math.round(n*Math.min(.95,base[s.id]+(rnd()-.5)*.16)), n];
-      if(!s.spotOnly){ const nm=20; rec.Moving[s.id] = [Math.round(nm*Math.max(.1,base[s.id]-.07+(rnd()-.5)*.16)), nm]; }
+      P.Spot[s.id] = [Math.round(n*Math.min(.95,base[s.id]+(rnd()-.5)*.16)), n];
+      if(!s.spotOnly){ const nm=20; P.Moving[s.id] = [Math.round(nm*Math.max(.1,base[s.id]-.07+(rnd()-.5)*.16)), nm]; }
+      if(i%2===0 && s.zone==="3P"){ S.Spot[s.id] = [Math.round(30*Math.min(.95,base[s.id]+.03+(rnd()-.5)*.16)), 30]; }
     });
-    if(i===0){ ["T3","W3R","TM","BMR"].forEach(k=>delete rec.Moving[k]); }
+    if(i===0){ ["T3","W3R","TM","BMR"].forEach(k=>delete P.Moving[k]); }
     d.days[ds] = rec;
   }
 }
@@ -674,7 +705,7 @@ function rangeDates(period, endDate){
   const from = addDays(endDate, -(+period-1));
   return all.filter(d=>d>=from);
 }
-function zoneTotal(dates, mode){ return total(sumOver(dates, mode), zoneOk); }
+function zoneTotal(dates, mode){ return total(sumOver(dates, mode, $("gSess").value), zoneOk); }
 function renderGraph(){
   const period = $("gPeriod").value;
   const dates = rangeDates(period, curDate).filter(ds => zoneTotal([ds],"Total")[1] > 0);
@@ -774,7 +805,7 @@ function volChart(el, dates, ser){
 }
 function spotBars(dates){
   document.querySelectorAll("#gSpotSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===gSpotMode));
-  const per = sumOver(dates, gSpotMode);
+  const per = sumOver(dates, gSpotMode, $("gSess").value);
   const color = gSpotMode==="Spot"?"var(--s-spot)":gSpotMode==="Moving"?"var(--s-move)":"var(--muted)";
   let h="";
   Object.keys(ZONES).forEach(z=>{
@@ -786,7 +817,7 @@ function spotBars(dates){
   });
   $("gSpots").innerHTML = dates.length ? h : `<div class="empty">記録なし</div>`;
 }
-$("gPeriod").onchange=renderGraph; $("gZone").onchange=renderGraph;
+$("gPeriod").onchange=renderGraph; $("gSess").onchange=renderGraph; $("gZone").onchange=renderGraph;
 document.querySelectorAll("#gSpotSeg button").forEach(b=>b.onclick=()=>{ gSpotMode=b.dataset.m; renderGraph(); });
 let rz; window.addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ if(tab==="graph") renderGraph(); },150); });
 
