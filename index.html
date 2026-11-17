@@ -138,7 +138,25 @@ tbody tr:last-child td{border-bottom:0}
 .card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:14px;display:grid;gap:12px}
 
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--rule);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
-nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-weight:700;font-size:13px;padding:4px 0}
+.rkhead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rkcap{font-size:13px;color:var(--muted)}
+.rkcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.rkcard{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:12px;display:grid;gap:6px;align-content:start;min-width:0}
+.rkcard h3{margin:0 0 2px;font-size:14px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.rkcard h3 small{font-weight:500;color:var(--muted);font-size:12px}
+.rk{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.rk li{display:grid;grid-template-columns:2.2em minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;background:var(--bg)}
+.rk li.me{box-shadow:inset 0 0 0 2px var(--accent)}
+.rk .n{font-family:var(--f-display);font-weight:700;font-size:18px;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums}
+.rk li.top .n{color:var(--accent)}
+.rk .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk .val{text-align:right;font-family:var(--f-display);font-weight:700;font-size:18px;line-height:1.1;font-variant-numeric:tabular-nums}
+.rk .val small{display:block;font-size:11.5px;color:var(--muted);font-weight:500}
+.rkout{font-size:12px;color:var(--muted)}
+.rkempty{font-size:13px;color:var(--muted);padding:14px 0;text-align:center}
+
 nav.tabs button{border:0;background:transparent;height:58px;display:grid;place-items:center;gap:0;font-size:12px;font-weight:700;color:var(--muted);padding-top:6px}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected="true"]{color:var(--accent)}
@@ -308,6 +326,19 @@ pre.report{white-space:pre-wrap;background:var(--bg);border:1px solid var(--rule
     <details class="raw"><summary>数値を表で見る</summary><div class="tablewrap"><table id="gTable"></table></div></details>
   </section>
 
+  <!-- ランキング -->
+  <section class="view wrap" id="v-rank" hidden>
+    <div class="rkhead">
+      <div class="seg" id="rkSeg" role="group" aria-label="期間">
+        <button data-k="day" aria-pressed="true">Day</button><button data-k="week" aria-pressed="false">Week</button><button data-k="total" aria-pressed="false">Total</button>
+      </div>
+      <select id="rkSess" aria-label="区分"><option value="all">練習+自主練</option><option value="練習">練習のみ</option><option value="自主練">自主練のみ</option></select>
+    </div>
+    <div class="rkhead" style="justify-content:space-between"><span class="rkcap" id="rkCap"></span><button class="linkbtn" id="rkReload" type="button">更新</button></div>
+    <div id="rkBody"><div class="rkempty">読み込み中…</div></div>
+    <p class="hint">管理者に報告済みの記録で集計しています。基準日は画面上部の日付です。</p>
+  </section>
+
   <!-- 設定 -->
   <section class="view wrap" id="v-settings" hidden>
     <div class="card">
@@ -346,6 +377,8 @@ pre.report{white-space:pre-wrap;background:var(--bg);border:1px solid var(--rule
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>集計</button>
     <button role="tab" data-tab="graph" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/><circle cx="20" cy="5" r="1.3" fill="currentColor"/></svg>グラフ</button>
+    <button role="tab" data-tab="rank" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>順位</button>
     <button role="tab" data-tab="settings" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg>設定</button>
   </div>
@@ -642,11 +675,11 @@ let tt; function toast(msg){ let t=document.querySelector(".toast"); if(!t){ t=d
 let tab="record";
 function showTab(t){
   tab=t;
-  ["record","stats","graph","settings"].forEach(k=>$("v-"+k).hidden = k!==t);
+  ["record","stats","graph","rank","settings"].forEach(k=>$("v-"+k).hidden = k!==t);
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected", b.dataset.tab===t));
   renderAll(); window.scrollTo(0,0);
 }
-function renderAll(){ if(tab==="record") renderRecord(); else if(tab==="stats") renderStats(); else if(tab==="graph") renderGraph(); else renderSettings(); $("date").value=curDate; $("who").textContent = db.player || "選手名未設定"; }
+function renderAll(){ if(tab==="record") renderRecord(); else if(tab==="stats") renderStats(); else if(tab==="graph") renderGraph(); else if(tab==="rank") renderRank(); else renderSettings(); $("date").value=curDate; $("who").textContent = db.player || "選手名未設定"; }
 
 /* ===== イベント ===== */
 $("date").addEventListener("change",e=>{ if(e.target.value){ curDate=e.target.value; renderAll(); } });
@@ -737,7 +770,7 @@ function renderGraph(){
 }
 function svgEl(tag, attrs, parent){ const e=document.createElementNS(NS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); if(parent) parent.appendChild(e); return e; }
 function shortDate(d){ const [,m,dd]=d.split("-").map(Number); return `${m}/${dd}`; }
-function xTicks(n, max){ if(n<=max) return [...Array(n).keys()]; const step=Math.ceil((n-1)/(max-1)); const t=[]; for(let i=0;i<n;i+=step) t.push(i); if(t[t.length-1]!==n-1){ if(n-1-t[t.length-1]<step/2) t.pop(); t.push(n-1);} return t; }
+function xTicks(n, max){ if(n<=max) return [...Array(n).keys()]; const step=Math.ceil((n-1)/(max-1)); const t=[]; for(let i=0;i<n;i+=step) t.push(i); if(t[t.length-1]!==n-1){ if(n-1-t[t.length-1]<=step/2) t.pop(); t.push(n-1);} return t; }
 function trendChart(el, dates, ser){
   el.innerHTML = "";
   if(!dates.length){ el.innerHTML = `<div class="empty">記録を入力すると推移が表示されます</div>`; return; }
@@ -820,6 +853,51 @@ function spotBars(dates){
 $("gPeriod").onchange=renderGraph; $("gSess").onchange=renderGraph; $("gZone").onchange=renderGraph;
 document.querySelectorAll("#gSpotSeg button").forEach(b=>b.onclick=()=>{ gSpotMode=b.dataset.m; renderGraph(); });
 let rz; window.addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ if(tab==="graph") renderGraph(); },150); });
+
+/* ---------- ランキング(共通描画) ---------- */
+function rankJp(d){ var p=d.split("-").map(Number); return p[1]+"/"+p[2]+"("+"日月火水木金土"[new Date(p[0],p[1]-1,p[2]).getDay()]+")"; }
+function rankEsc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+function rankCaption(R, k){
+  if(k==="day") return rankJp(R.anchor)+" の記録";
+  if(k==="week") return "今週 "+rankJp(R.weekStart)+" 〜 "+rankJp(R.weekEnd);
+  return "通算(〜"+rankJp(R.anchor)+")";
+}
+function rankHTML(R, k, me){
+  var P = R[k], min = R.min[k];
+  function ranked(list, val){ var prev=null, rank=0; return list.map(function(x,i){ var v=val(x); if(v!==prev){ rank=i+1; prev=v; } return {rank:rank, x:x}; }); }
+  function li(o, main, sub){ var x=o.x; return '<li class="'+(o.rank<=3?"top ":"")+(me && x.name===me?"me":"")+'"><span class="n">'+o.rank+'</span><span class="nm">'+rankEsc(x.name)+'</span><span class="val">'+main+'<small>'+sub+'</small></span></li>'; }
+  var vol = ranked(P.volume, function(x){ return x.a; }).map(function(o){ return li(o, o.x.a+"<span style='font-size:12px'>本</span>", o.x.m+"本成功 ・ "+(o.x.m/o.x.a*100).toFixed(1)+"%"); }).join("");
+  var pc = ranked(P.pct, function(x){ return Math.round(x.m/x.a*10000); }).map(function(o){ return li(o, (o.x.m/o.x.a*100).toFixed(1)+"%", o.x.m+"/"+o.x.a); }).join("");
+  return '<div class="rkcards">'+
+    '<div class="rkcard"><h3>本数ランキング<small>'+P.volume.length+'人</small></h3>'+(vol?'<ol class="rk">'+vol+'</ol>':'<div class="rkempty">まだ報告がありません</div>')+'</div>'+
+    '<div class="rkcard"><h3>成功率ランキング<small>'+min+'本以上が対象</small></h3>'+(pc?'<ol class="rk">'+pc+'</ol>':'<div class="rkempty">対象者がいません('+min+'本以上で対象)</div>')+
+      (P.below.length?'<div class="rkout">対象外(本数不足):'+P.below.map(function(x){ return rankEsc(x.name)+" "+x.a+"本"; }).join("、")+'</div>':'')+'</div>'+
+  '</div>';
+}
+let rkKey = "day", rkData = null, rkReq = "";
+function demoRanking(){
+  const names=["サンプル選手","福岡太郎","博多次郎","天神三郎","中洲四郎","姪浜五郎"]; let seed=11; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
+  const mk=(mul,min)=>{ const list=names.map(n=>{ const a=Math.round((0.4+rnd())*mul); return {name:n, a, m:Math.round(a*(0.35+rnd()*0.3))}; });
+    return {volume:list.slice().sort((p,q)=>q.a-p.a), pct:list.filter(p=>p.a>=min).sort((p,q)=>q.m/q.a-p.m/p.a), below:list.filter(p=>p.a<min)}; };
+  const d=new Date(curDate.replace(/-/g,"/")), dow=(d.getDay()+6)%7;
+  return {anchor:curDate, weekStart:addDays(curDate,-dow), weekEnd:addDays(curDate,6-dow), min:{day:50,week:200,total:500}, day:mk(120,50), week:mk(600,200), total:mk(3000,500)};
+}
+async function renderRank(force){
+  document.querySelectorAll("#rkSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===rkKey));
+  const sess = $("rkSess").value, key = curDate+"|"+sess, ep = endpoint();
+  const draw = () => { $("rkCap").textContent = rankCaption(rkData, rkKey); $("rkBody").innerHTML = rankHTML(rkData, rkKey, db.player); };
+  if(rkData && rkReq===key && !force){ draw(); return; }
+  if(DEMO && db.demo){ rkData = demoRanking(); rkReq = key; draw(); return; }
+  if(!ep){ $("rkCap").textContent=""; $("rkBody").innerHTML = '<div class="rkempty">報告先URLが未設定のため表示できません</div>'; return; }
+  $("rkBody").innerHTML = '<div class="rkempty">読み込み中…</div>';
+  try{
+    const res = await fetch(ep+"?ranking=1&date="+curDate+"&sess="+encodeURIComponent(sess));
+    const j = await res.json(); if(!j.ok) throw new Error(j.error||"error");
+    rkData = j; rkReq = key; if(tab==="rank") draw();
+  }catch(e){ $("rkCap").textContent=""; $("rkBody").innerHTML = '<div class="rkempty">ランキングを取得できませんでした。通信状態を確認して「更新」を押してください。</div>'; }
+}
+document.querySelectorAll("#rkSeg button").forEach(b=>b.onclick=()=>{ rkKey=b.dataset.k; renderRank(); });
+$("rkSess").onchange=()=>renderRank(); $("rkReload").onclick=()=>renderRank(true);
 
 renderAll();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
