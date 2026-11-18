@@ -863,16 +863,14 @@ function rankCaption(R, k){
   return "通算(〜"+rankJp(R.anchor)+")";
 }
 function rankHTML(R, k, me){
-  var P = R[k], min = R.min[k];
+  var P = R[k], min = R.min[k], label = {day:"Day",week:"Week",total:"Total"}[k];
   function ranked(list, val){ var prev=null, rank=0; return list.map(function(x,i){ var v=val(x); if(v!==prev){ rank=i+1; prev=v; } return {rank:rank, x:x}; }); }
   function li(o, main, sub){ var x=o.x; return '<li class="'+(o.rank<=3?"top ":"")+(me && x.name===me?"me":"")+'"><span class="n">'+o.rank+'</span><span class="nm">'+rankEsc(x.name)+'</span><span class="val">'+main+'<small>'+sub+'</small></span></li>'; }
-  var vol = ranked(P.volume, function(x){ return x.a; }).map(function(o){ return li(o, o.x.a+"<span style='font-size:12px'>本</span>", o.x.m+"本成功 ・ "+(o.x.m/o.x.a*100).toFixed(1)+"%"); }).join("");
   var pc = ranked(P.pct, function(x){ return Math.round(x.m/x.a*10000); }).map(function(o){ return li(o, (o.x.m/o.x.a*100).toFixed(1)+"%", o.x.m+"/"+o.x.a); }).join("");
-  return '<div class="rkcards">'+
-    '<div class="rkcard"><h3>本数ランキング<small>'+P.volume.length+'人</small></h3>'+(vol?'<ol class="rk">'+vol+'</ol>':'<div class="rkempty">まだ報告がありません</div>')+'</div>'+
-    '<div class="rkcard"><h3>成功率ランキング<small>'+min+'本以上が対象</small></h3>'+(pc?'<ol class="rk">'+pc+'</ol>':'<div class="rkempty">対象者がいません('+min+'本以上で対象)</div>')+
-      (P.below.length?'<div class="rkout">対象外(本数不足):'+P.below.map(function(x){ return rankEsc(x.name)+" "+x.a+"本"; }).join("、")+'</div>':'')+'</div>'+
-  '</div>';
+  var cond = min > 1 ? min+"本以上が対象" : "報告者全員が対象";
+  return '<div class="rkcard"><h3>'+label+' 成功率ランキング<small>'+cond+'</small></h3>'+
+    (pc?'<ol class="rk">'+pc+'</ol>':'<div class="rkempty">'+(min>1?'対象者がいません('+min+'本以上で対象)':'まだ報告がありません')+'</div>')+
+    (P.below.length?'<div class="rkout">対象外(本数不足):'+P.below.map(function(x){ return rankEsc(x.name)+" "+x.a+"本"; }).join("、")+'</div>':'')+'</div>';
 }
 let rkKey = "day", rkData = null, rkReq = "";
 function demoRanking(){
@@ -880,7 +878,7 @@ function demoRanking(){
   const mk=(mul,min)=>{ const list=names.map(n=>{ const a=Math.round((0.4+rnd())*mul); return {name:n, a, m:Math.round(a*(0.35+rnd()*0.3))}; });
     return {volume:list.slice().sort((p,q)=>q.a-p.a), pct:list.filter(p=>p.a>=min).sort((p,q)=>q.m/q.a-p.m/p.a), below:list.filter(p=>p.a<min)}; };
   const d=new Date(curDate.replace(/-/g,"/")), dow=(d.getDay()+6)%7;
-  return {anchor:curDate, weekStart:addDays(curDate,-dow), weekEnd:addDays(curDate,6-dow), min:{day:50,week:200,total:500}, day:mk(120,50), week:mk(600,200), total:mk(3000,500)};
+  return {anchor:curDate, weekStart:addDays(curDate,-dow), weekEnd:addDays(curDate,6-dow), min:{day:50,week:200,total:1}, day:mk(120,50), week:mk(600,200), total:mk(3000,500)};
 }
 async function renderRank(force){
   document.querySelectorAll("#rkSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===rkKey));
