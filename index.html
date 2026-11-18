@@ -863,22 +863,27 @@ function rankCaption(R, k){
   return "通算(〜"+rankJp(R.anchor)+")";
 }
 function rankHTML(R, k, me){
-  var P = R[k], min = R.min[k], label = {day:"Day",week:"Week",total:"Total"}[k];
+  var min = R.min[k], label = {day:"Day",week:"Week",total:"Total"}[k];
   function ranked(list, val){ var prev=null, rank=0; return list.map(function(x,i){ var v=val(x); if(v!==prev){ rank=i+1; prev=v; } return {rank:rank, x:x}; }); }
   function li(o, main, sub){ var x=o.x; return '<li class="'+(o.rank<=3?"top ":"")+(me && x.name===me?"me":"")+'"><span class="n">'+o.rank+'</span><span class="nm">'+rankEsc(x.name)+'</span><span class="val">'+main+'<small>'+sub+'</small></span></li>'; }
-  var pc = ranked(P.pct, function(x){ return Math.round(x.m/x.a*10000); }).map(function(o){ return li(o, (o.x.m/o.x.a*100).toFixed(1)+"%", o.x.m+"/"+o.x.a); }).join("");
   var cond = min > 1 ? min+"本以上が対象" : "報告者全員が対象";
-  return '<div class="rkcard"><h3>'+label+' 成功率ランキング<small>'+cond+'</small></h3>'+
-    (pc?'<ol class="rk">'+pc+'</ol>':'<div class="rkempty">'+(min>1?'対象者がいません('+min+'本以上で対象)':'まだ報告がありません')+'</div>')+
-    (P.below.length?'<div class="rkout">対象外(本数不足):'+P.below.map(function(x){ return rankEsc(x.name)+" "+x.a+"本"; }).join("、")+'</div>':'')+'</div>';
+  function card(z, title){
+    var P = (R[k] && R[k][z]) || {pct:[], below:[]};
+    var pc = ranked(P.pct, function(x){ return Math.round(x.m/x.a*10000); }).map(function(o){ return li(o, (o.x.m/o.x.a*100).toFixed(1)+"%", o.x.m+"/"+o.x.a); }).join("");
+    return '<div class="rkcard"><h3>'+label+' '+title+' 成功率<small>'+cond+'</small></h3>'+
+      (pc?'<ol class="rk">'+pc+'</ol>':'<div class="rkempty">'+(min>1?'対象者がいません('+title+' '+min+'本以上で対象)':'まだ報告がありません')+'</div>')+
+      (P.below.length?'<div class="rkout">対象外(本数不足):'+P.below.map(function(x){ return rankEsc(x.name)+" "+x.a+"本"; }).join("、")+'</div>':'')+'</div>';
+  }
+  return '<div class="rkcards">'+card("3P","3P")+card("MID","2P")+'</div>';
 }
 let rkKey = "day", rkData = null, rkReq = "";
 function demoRanking(){
   const names=["サンプル選手","福岡太郎","博多次郎","天神三郎","中洲四郎","姪浜五郎"]; let seed=11; const rnd=()=>{ seed=(seed*9301+49297)%233280; return seed/233280; };
-  const mk=(mul,min)=>{ const list=names.map(n=>{ const a=Math.round((0.4+rnd())*mul); return {name:n, a, m:Math.round(a*(0.35+rnd()*0.3))}; });
-    return {volume:list.slice().sort((p,q)=>q.a-p.a), pct:list.filter(p=>p.a>=min).sort((p,q)=>q.m/q.a-p.m/p.a), below:list.filter(p=>p.a<min)}; };
+  const one=(mul,min,base)=>{ const list=names.map(n=>{ const a=Math.round((0.4+rnd())*mul); return {name:n, a, m:Math.round(a*(base+rnd()*0.25))}; });
+    return {pct:list.filter(p=>p.a>=min).sort((p,q)=>q.m/q.a-p.m/p.a), below:list.filter(p=>p.a<min)}; };
+  const mk=(mul,min)=>({"3P":one(mul,min,0.28), "MID":one(mul,min,0.38)});
   const d=new Date(curDate.replace(/-/g,"/")), dow=(d.getDay()+6)%7;
-  return {anchor:curDate, weekStart:addDays(curDate,-dow), weekEnd:addDays(curDate,6-dow), min:{day:50,week:200,total:1}, day:mk(120,50), week:mk(600,200), total:mk(3000,500)};
+  return {anchor:curDate, weekStart:addDays(curDate,-dow), weekEnd:addDays(curDate,6-dow), min:{day:50,week:200,total:1}, day:mk(70,50), week:mk(300,200), total:mk(1500,1)};
 }
 async function renderRank(force){
   document.querySelectorAll("#rkSeg button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.k===rkKey));
